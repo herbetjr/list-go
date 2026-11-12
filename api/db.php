@@ -80,6 +80,21 @@ function executarMigrations(PDO $db, bool $isNew): void {
             FOREIGN KEY (lista_id) REFERENCES listas (id) ON DELETE CASCADE,
             FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS historico_itens (
+            id VARCHAR PRIMARY KEY NOT NULL,
+            lista_id VARCHAR NOT NULL,
+            item_id VARCHAR,
+            item_descricao VARCHAR(250) NOT NULL,
+            tipo_acao VARCHAR(50) NOT NULL,
+            responsavel_antigo VARCHAR(150),
+            responsavel_novo VARCHAR(150),
+            quantidade_antiga VARCHAR(50),
+            quantidade_nova VARCHAR(50),
+            detalhes TEXT NOT NULL,
+            criado_em DATETIME NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (lista_id) REFERENCES listas (id) ON DELETE CASCADE
+        );
     ");
 
     // 2. Se o banco já existia, garantir que colunas adicionadas em migrations posteriores existam

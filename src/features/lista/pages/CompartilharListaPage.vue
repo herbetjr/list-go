@@ -42,8 +42,11 @@
                 <q-icon name="info" color="primary" />
               </template>
               <div class="text-body2">
-                <strong>Você foi convidado para colaborar nesta lista!</strong>
-                Não é necessário fazer login. Informe seu nome e clique no item que deseja assumir.
+                <div class="text-weight-bold text-primary q-mb-xs">Você foi convidado para colaborar nesta lista! (Não é necessário fazer login)</div>
+                <div>Clique no item que deseja assumir, informe seu nome e a quantidade.</div>
+                <div class="text-caption text-grey-7 q-mt-xs">
+                  Para alterar a quantidade, basta clicar no seu nome que aparecerá uma janela de alteração. Caso não queira mais assumir aquele item, basta clicar em "Deixar sem ninguém".
+                </div>
               </div>
             </q-banner>
           </div>

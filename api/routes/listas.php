@@ -198,6 +198,10 @@ function handleListasRoutes(string $method, array $uriParts, ?array $body): void
             return;
         }
 
+        $respAntigo = $item['responsavelNome'];
+        $qtdAntiga = $item['quantidade'];
+        $descAntiga = $item['descricao'];
+
         $descricao = isset($body['descricao']) ? trim($body['descricao']) : $item['descricao'];
         $quantidade = isset($body['quantidade']) ? trim($body['quantidade']) : $item['quantidade'];
         $responsavelNome = array_key_exists('responsavelNome', $body) ? ($body['responsavelNome'] !== null ? trim($body['responsavelNome']) : null) : $item['responsavelNome'];
@@ -209,6 +213,58 @@ function handleListasRoutes(string $method, array $uriParts, ?array $body): void
             WHERE id = ?
         ");
         $up->execute([$descricao, $quantidade, $responsavelNome, $concluido, $itemId]);
+
+        // Registrar no histórico de atividades
+        if (!empty($body['historico']) && is_array($body['historico'])) {
+            $h = $body['historico'];
+            registrarHistoricoItem(
+                $db,
+                $listaId,
+                $itemId,
+                $h['descricao'] ?? $descricao,
+                $h['tipo'] ?? 'atualizacao',
+                $respAntigo,
+                $responsavelNome,
+                $qtdAntiga,
+                $quantidade,
+                $h['detalhes'] ?? 'Item atualizado'
+            );
+        } else {
+            $teveMudancaResp = ($respAntigo !== $responsavelNome);
+            $teveMudancaQtd = ($qtdAntiga !== $quantidade);
+
+            if ($teveMudancaResp || $teveMudancaQtd) {
+                if (empty($respAntigo) && !empty($responsavelNome)) {
+                    $tipoAcao = 'marcou';
+                    $detalhes = "{$responsavelNome} marcou este item ({$quantidade} un)";
+                } elseif (!empty($respAntigo) && empty($responsavelNome)) {
+                    $tipoAcao = 'liberou';
+                    $detalhes = "{$respAntigo} deixou o item sem ninguém";
+                } elseif (!empty($responsavelNome) && $teveMudancaQtd && !$teveMudancaResp) {
+                    $tipoAcao = 'alterou_quantidade';
+                    $detalhes = "{$responsavelNome} alterou a quantidade de {$qtdAntiga} para {$quantidade}";
+                } elseif ($teveMudancaResp && !empty($respAntigo) && !empty($responsavelNome)) {
+                    $tipoAcao = 'alterou_responsavel';
+                    $detalhes = "Responsável alterado de {$respAntigo} para {$responsavelNome}";
+                } else {
+                    $tipoAcao = 'alterou';
+                    $detalhes = "Item atualizado";
+                }
+
+                registrarHistoricoItem(
+                    $db,
+                    $listaId,
+                    $itemId,
+                    $descricao,
+                    $tipoAcao,
+                    $respAntigo,
+                    $responsavelNome,
+                    $qtdAntiga,
+                    $quantidade,
+                    $detalhes
+                );
+            }
+        }
 
         $itemStmt->execute([$itemId, $listaId]);
         echo json_encode(formatarItem($itemStmt->fetch()));
@@ -387,8 +443,129 @@ function handleListasRoutes(string $method, array $uriParts, ?array $body): void
         return;
     }
 
+    // === SUB-ROTAS DE HISTÓRICO ===
+    // GET /api/listas/:idOuCodigo/historico (Apenas administradores da lista ou do sistema)
+    if ($method === 'GET' && $sub1 === 'historico' && count($uriParts) === 3) {
+        $ehAdmin = ($usuarioTipo === 'admin') || $permissoes['dono'] || $permissoes['podeEditarItens'] || $permissoes['podeEditarLista'];
+        if (!$ehAdmin) {
+            http_response_code(403);
+            echo json_encode(['message' => 'Apenas administradores podem visualizar o histórico desta lista']);
+            return;
+        }
+
+        $stmtHist = $db->prepare("
+            SELECT * FROM historico_itens 
+            WHERE lista_id = ? 
+            ORDER BY criado_em DESC 
+            LIMIT 200
+        ");
+        $stmtHist->execute([$listaId]);
+        $rows = $stmtHist->fetchAll();
+
+        $historico = array_map(function ($r) {
+            return [
+                'id' => $r['id'],
+                'listaId' => $r['lista_id'],
+                'itemId' => $r['item_id'],
+                'itemDescricao' => $r['item_descricao'],
+                'tipoAcao' => $r['tipo_acao'],
+                'responsavelAntigo' => $r['responsavel_antigo'],
+                'responsavelNovo' => $r['responsavel_novo'],
+                'quantidadeAntiga' => $r['quantidade_antiga'],
+                'quantidadeNova' => $r['quantidade_nova'],
+                'detalhes' => $r['detalhes'],
+                'criadoEm' => $r['criado_em'],
+            ];
+        }, $rows);
+
+        echo json_encode($historico);
+        return;
+    }
+
+    // POST /api/listas/:idOuCodigo/historico (Registrar ação de histórico)
+    if ($method === 'POST' && $sub1 === 'historico' && count($uriParts) === 3) {
+        $itemDescricao = trim($body['descricao'] ?? 'Item');
+        $tipoAcao = trim($body['tipo'] ?? 'atividade');
+        $detalhes = trim($body['detalhes'] ?? '');
+        $respAntigo = $body['responsavelAntigo'] ?? null;
+        $respNovo = $body['responsavelNovo'] ?? null;
+        $qtdAntiga = $body['quantidadeAntiga'] ?? null;
+        $qtdNova = $body['quantidadeNova'] ?? null;
+        $itemId = $body['itemId'] ?? null;
+
+        if (!empty($detalhes)) {
+            registrarHistoricoItem(
+                $db,
+                $listaId,
+                $itemId,
+                $itemDescricao,
+                $tipoAcao,
+                $respAntigo,
+                $respNovo,
+                $qtdAntiga,
+                $qtdNova,
+                $detalhes
+            );
+        }
+
+        echo json_encode(['success' => true]);
+        return;
+    }
+
+    // DELETE /api/listas/:idOuCodigo/historico (Limpar histórico)
+    if ($method === 'DELETE' && $sub1 === 'historico' && count($uriParts) === 3) {
+        $ehDonoOuAdmin = ($usuarioTipo === 'admin') || $permissoes['dono'] || $permissoes['podeEditarLista'];
+        if (!$ehDonoOuAdmin) {
+            http_response_code(403);
+            echo json_encode(['message' => 'Apenas o dono da lista pode limpar o histórico']);
+            return;
+        }
+
+        $del = $db->prepare("DELETE FROM historico_itens WHERE lista_id = ?");
+        $del->execute([$listaId]);
+        http_response_code(204);
+        return;
+    }
+
     http_response_code(404);
     echo json_encode(['message' => 'Rota lista não encontrada']);
+}
+
+function registrarHistoricoItem(
+    PDO $db,
+    string $listaId,
+    ?string $itemId,
+    string $itemDescricao,
+    string $tipoAcao,
+    ?string $responsavelAntigo,
+    ?string $responsavelNovo,
+    ?string $qtdAntiga,
+    ?string $qtdNova,
+    string $detalhes
+): void {
+    try {
+        $id = generateId();
+        $stmt = $db->prepare("
+            INSERT INTO historico_itens (
+                id, lista_id, item_id, item_descricao, tipo_acao,
+                responsavel_antigo, responsavel_novo, quantidade_antiga, quantidade_nova, detalhes, criado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ");
+        $stmt->execute([
+            $id,
+            $listaId,
+            $itemId,
+            $itemDescricao,
+            $tipoAcao,
+            $responsavelAntigo,
+            $responsavelNovo,
+            $qtdAntiga,
+            $qtdNova,
+            $detalhes,
+        ]);
+    } catch (Throwable $e) {
+        error_log("Erro ao registrar historico: " . $e->getMessage());
+    }
 }
 
 function calcularPermissoesLista(PDO $db, array $lista, ?string $usuarioId): array {

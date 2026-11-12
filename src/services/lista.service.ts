@@ -5,9 +5,11 @@ import type {
   AtualizarPermissoesAdministradorPayload,
   CriarItemPayload,
   CriarListaPayload,
+  HistoricoItem,
   ItemLista,
   Lista,
   ListaAdministradorItem,
+  RegistrarHistoricoPayload,
   VincularAdministradorPayload,
 } from '@/types/lista.types';
 
@@ -67,6 +69,18 @@ export const listaService = {
   },
   obterUrlEventos(idOuCodigo: string): string {
     return `${BASE_URL}/listas/${encodeURIComponent(idOuCodigo)}/eventos`;
+  },
+  obterHistorico(idOuCodigo: string): Promise<HistoricoItem[]> {
+    return http.get<HistoricoItem[]>(`/listas/${idOuCodigo}/historico`);
+  },
+  registrarHistorico(
+    idOuCodigo: string,
+    payload: RegistrarHistoricoPayload,
+  ): Promise<{ success: boolean }> {
+    return http.post<{ success: boolean }>(`/listas/${idOuCodigo}/historico`, payload, false);
+  },
+  limparHistorico(idOuCodigo: string): Promise<void> {
+    return http.delete<void>(`/listas/${idOuCodigo}/historico`);
   },
 };
 

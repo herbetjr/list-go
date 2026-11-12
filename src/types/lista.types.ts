@@ -88,5 +88,35 @@ export interface AtualizarItemPayload {
   quantidade?: string;
   responsavelNome?: string | null;
   concluido?: boolean;
+  historico?: {
+    tipo?: string;
+    detalhes?: string;
+    descricao?: string;
+  };
+}
+
+export interface HistoricoItem {
+  id: string;
+  listaId: string;
+  itemId?: string | null;
+  itemDescricao: string;
+  tipoAcao: 'marcou' | 'alterou_quantidade' | 'liberou' | 'alterou_responsavel' | string;
+  responsavelAntigo?: string | null;
+  responsavelNovo?: string | null;
+  quantidadeAntiga?: string | null;
+  quantidadeNova?: string | null;
+  detalhes: string;
+  criadoEm: string;
+}
+
+export interface RegistrarHistoricoPayload {
+  descricao: string;
+  tipo: string;
+  detalhes: string;
+  responsavelAntigo?: string | null;
+  responsavelNovo?: string | null;
+  quantidadeAntiga?: string | null;
+  quantidadeNova?: string | null;
+  itemId?: string | null;
 }
 

@@ -100,6 +100,21 @@ export const useListaStore = defineStore('lista', () => {
     }
   }
 
+  async function obterHistorico(idOuCodigo: string) {
+    return listaService.obterHistorico(idOuCodigo);
+  }
+
+  async function registrarHistorico(
+    idOuCodigo: string,
+    payload: Parameters<typeof listaService.registrarHistorico>[1],
+  ) {
+    return listaService.registrarHistorico(idOuCodigo, payload);
+  }
+
+  async function limparHistorico(idOuCodigo: string) {
+    return listaService.limparHistorico(idOuCodigo);
+  }
+
   return {
     minhasListas,
     listaAtual,
@@ -112,6 +127,9 @@ export const useListaStore = defineStore('lista', () => {
     adicionarItem,
     atualizarItem,
     removerItem,
+    obterHistorico,
+    registrarHistorico,
+    limparHistorico,
   };
 });
 

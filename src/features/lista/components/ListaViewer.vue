@@ -191,6 +191,21 @@
               />
 
             </q-form>
+
+            <!-- Botão Histórico de Atividades (Apenas Administrador) -->
+            <div v-if="isAdministrador" class="q-mt-md">
+              <q-separator class="q-mb-md" />
+              <q-btn
+                outline
+                color="primary"
+                icon="history"
+                label="Histórico de alterações"
+                class="full-width q-py-sm text-weight-bold"
+                @click="abrirModalHistorico"
+              >
+                <q-tooltip>Ver quem marcou, alterou quantidade ou liberou itens</q-tooltip>
+              </q-btn>
+            </div>
           </q-card>
         </div>
 
@@ -377,13 +392,110 @@
       :titulo-lista="lista?.titulo || ''"
       @administradores-alterados="recarregarLista"
     />
+
+    <!-- Modal Histórico de Atividades / Alterações (Apenas Administrador) -->
+    <q-dialog v-model="modalHistorico">
+      <q-card style="width: 100%; max-width: 680px; border-radius: 16px" class="q-pa-md">
+        <q-card-section class="row items-center justify-between q-pb-none">
+          <div class="row items-center q-gutter-x-sm">
+            <q-avatar icon="history" color="light-blue-1" text-color="primary" size="42px" />
+            <div>
+              <div class="text-h6 text-weight-bold">Histórico de Atividades</div>
+              <div class="text-caption text-grey-7">
+                Registro de quem marcou, alterou quantidade ou liberou itens
+              </div>
+            </div>
+          </div>
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="q-pt-md" style="max-height: 60vh; overflow-y: auto">
+          <!-- Spinner de carregamento -->
+          <div v-if="carregandoHistorico" class="text-center q-py-xl">
+            <q-spinner color="primary" size="40px" />
+            <div class="text-grey-6 q-mt-sm">Carregando histórico...</div>
+          </div>
+
+          <!-- Estado vazio -->
+          <div v-else-if="!listaHistorico || listaHistorico.length === 0" class="text-center text-grey-6 q-py-xl">
+            <q-icon name="history_toggle_off" size="56px" class="text-grey-4 q-mb-sm" />
+            <div class="text-subtitle1 text-weight-medium">Nenhuma atividade registrada ainda</div>
+            <div class="text-caption text-grey-5 q-mt-xs">
+              Quando alguém marcar itens, alterar quantidade ou deixar sem ninguém na tela de compartilhamento, os registros aparecerão aqui.
+            </div>
+          </div>
+
+          <!-- Lista de eventos -->
+          <q-list v-else separator class="rounded-borders">
+            <q-item v-for="item in listaHistorico" :key="item.id" class="q-py-md">
+              <q-item-section avatar top>
+                <q-avatar
+                  :icon="iconePorAcao(item.tipoAcao)"
+                  :color="corFundoPorAcao(item.tipoAcao)"
+                  :text-color="corTextoPorAcao(item.tipoAcao)"
+                  size="36px"
+                />
+              </q-item-section>
+
+              <q-item-section>
+                <div class="row items-center justify-between no-wrap">
+                  <span class="text-weight-bold text-subtitle2 text-grey-9 ellipsis">{{ item.itemDescricao }}</span>
+                  <span class="text-caption text-grey-6 q-ml-sm text-no-wrap">{{ formatarDataHora(item.criadoEm) }}</span>
+                </div>
+                <div class="text-body2 text-grey-8 q-mt-xs">
+                  {{ item.detalhes }}
+                </div>
+                <div class="row items-center q-gutter-x-sm q-mt-xs">
+                  <q-badge
+                    :color="corBadgePorAcao(item.tipoAcao)"
+                    :label="labelBadgePorAcao(item.tipoAcao)"
+                    class="q-px-sm"
+                  />
+                  <span v-if="item.responsavelNovo" class="text-caption text-grey-7">
+                    Responsável: <strong>{{ item.responsavelNovo }}</strong>
+                  </span>
+                </div>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-actions align="between" class="q-pt-sm">
+          <q-btn
+            v-if="isDonoDaLista && listaHistorico.length > 0"
+            flat
+            dense
+            color="negative"
+            label="Limpar histórico"
+            icon="delete_outline"
+            :loading="limpandoHistorico"
+            @click="confirmarLimparHistorico"
+          />
+          <div v-else></div>
+
+          <div class="row q-gutter-x-sm">
+            <q-btn
+              flat
+              color="primary"
+              icon="refresh"
+              label="Atualizar"
+              :loading="carregandoHistorico"
+              @click="carregarHistorico"
+            />
+            <q-btn unelevated color="primary" label="Fechar" v-close-popup />
+          </div>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import type { ItemLista, Lista } from '@/types/lista.types';
+import type { HistoricoItem, ItemLista, Lista } from '@/types/lista.types';
 import { useListaStore } from '@/stores/lista.store';
 import { useAuthStore } from '@/stores/auth.store';
 import QrCodeDialog from '@/components/QrCodeDialog.vue';
@@ -682,6 +794,11 @@ async function confirmarAssumirItem() {
         await listaStore.atualizarItem(props.idOuCodigo, itemAtual.id, {
           quantidade: String(assumida),
           responsavelNome: nomeLimpo,
+          historico: {
+            tipo: 'marcou',
+            detalhes: `${nomeLimpo} marcou ${assumida} unidade(s) deste item (juntou ${restante} restante(s) na lista)`,
+            descricao: itemAtual.descricao,
+          },
         });
 
         $q.notify({
@@ -695,6 +812,11 @@ async function confirmarAssumirItem() {
         await listaStore.atualizarItem(props.idOuCodigo, itemAtual.id, {
           quantidade: String(assumida),
           responsavelNome: nomeLimpo,
+          historico: {
+            tipo: 'marcou',
+            detalhes: `${nomeLimpo} marcou ${assumida} unidade(s) deste item (restaram ${restante} disponíveis)`,
+            descricao: itemAtual.descricao,
+          },
         });
 
         // 2. Cria a nova linha com a quantidade restante disponível sem responsável
@@ -712,9 +834,21 @@ async function confirmarAssumirItem() {
       }
     } else {
       // Assume o item inteiro (sem divisão)
+      const tipoAcao = (itemSelecionado.value.responsavelNome === nomeLimpo && itemSelecionado.value.quantidade !== String(assumida))
+        ? 'alterou_quantidade'
+        : 'marcou';
+      const detalhesAcao = tipoAcao === 'alterou_quantidade'
+        ? `${nomeLimpo} alterou a quantidade para ${assumida}`
+        : `${nomeLimpo} marcou este item (${assumida} unidade(s))`;
+
       await listaStore.atualizarItem(props.idOuCodigo, itemSelecionado.value.id, {
         quantidade: String(assumida),
         responsavelNome: nomeLimpo,
+        historico: {
+          tipo: tipoAcao,
+          detalhes: detalhesAcao,
+          descricao: itemSelecionado.value.descricao,
+        },
       });
 
       $q.notify({
@@ -756,6 +890,8 @@ async function liberarItem() {
   salvandoItem.value = true;
   try {
     const itemAtual = itemSelecionado.value;
+    const respItem = itemAtual.responsavelNome || 'Participante';
+
     // Procura outro item com a mesma descrição que já esteja sem responsável
     const itemMesmoNomeSemResponsavel = listaStore.listaAtual?.itens.find((i) => {
       return (
@@ -780,6 +916,18 @@ async function liberarItem() {
         responsavelNome: null,
       });
 
+      // Registra no histórico antes de remover o item
+      await listaStore.registrarHistorico(props.idOuCodigo, {
+        descricao: itemAtual.descricao,
+        tipo: 'liberou',
+        detalhes: `${respItem} deixou o item sem ninguém (${itemAtual.quantidade} un liberada(s))`,
+        responsavelAntigo: respItem,
+        responsavelNovo: null,
+        quantidadeAntiga: itemAtual.quantidade,
+        quantidadeNova: novaQtd,
+        itemId: itemAtual.id,
+      });
+
       // 2. Remove o item atual que foi abandonado
       await listaStore.removerItem(props.idOuCodigo, itemAtual.id);
 
@@ -792,6 +940,11 @@ async function liberarItem() {
       // Se não houver outro item idêntico sem responsável, apenas desvincula o responsável
       await listaStore.atualizarItem(props.idOuCodigo, itemAtual.id, {
         responsavelNome: null,
+        historico: {
+          tipo: 'liberou',
+          detalhes: `${respItem} deixou o item sem ninguém (${itemAtual.quantidade} un liberada(s))`,
+          descricao: itemAtual.descricao,
+        },
       });
 
       $q.notify({
@@ -923,6 +1076,127 @@ const podeRemoverItens = computed(() => {
   }
   return true;
 });
+
+const isAdministrador = computed(() => {
+  if (props.modoCompartilhado) return false;
+  return isDonoDaLista.value || podeEditarItens.value || podeEditarLista.value || authStore.usuario?.tipo === 'admin';
+});
+
+const modalHistorico = ref(false);
+const carregandoHistorico = ref(false);
+const limpandoHistorico = ref(false);
+const listaHistorico = ref<HistoricoItem[]>([]);
+
+async function abrirModalHistorico() {
+  modalHistorico.value = true;
+  await carregarHistorico();
+}
+
+async function carregarHistorico() {
+  carregandoHistorico.value = true;
+  try {
+    listaHistorico.value = await listaStore.obterHistorico(props.idOuCodigo);
+  } catch {
+    $q.notify({
+      type: 'negative',
+      message: 'Não foi possível carregar o histórico de atividades.',
+      position: 'top',
+    });
+  } finally {
+    carregandoHistorico.value = false;
+  }
+}
+
+function confirmarLimparHistorico() {
+  $q.dialog({
+    title: 'Limpar histórico',
+    message: 'Tem certeza que deseja apagar todos os registros de atividades desta lista?',
+    cancel: { flat: true, label: 'Cancelar', color: 'grey-7' },
+    ok: { unelevated: true, label: 'Sim, limpar', color: 'negative' },
+  }).onOk(async () => {
+    limpandoHistorico.value = true;
+    try {
+      await listaStore.limparHistorico(props.idOuCodigo);
+      listaHistorico.value = [];
+      $q.notify({
+        type: 'positive',
+        message: 'Histórico limpo com sucesso.',
+        position: 'top',
+      });
+    } catch {
+      $q.notify({
+        type: 'negative',
+        message: 'Falha ao limpar histórico.',
+        position: 'top',
+      });
+    } finally {
+      limpandoHistorico.value = false;
+    }
+  });
+}
+
+function formatarDataHora(dataIso: string): string {
+  if (!dataIso) return '';
+  const parsedIso = dataIso.endsWith('Z') || dataIso.includes('+') ? dataIso : dataIso.replace(' ', 'T') + 'Z';
+  const d = new Date(parsedIso);
+  return isNaN(d.getTime()) ? dataIso : d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function iconePorAcao(tipoAcao: string): string {
+  switch (tipoAcao) {
+    case 'marcou': return 'person_add';
+    case 'alterou_quantidade': return 'edit_note';
+    case 'liberou': return 'person_off';
+    case 'alterou_responsavel': return 'swap_horiz';
+    default: return 'history';
+  }
+}
+
+function corBadgePorAcao(tipoAcao: string): string {
+  switch (tipoAcao) {
+    case 'marcou': return 'primary';
+    case 'alterou_quantidade': return 'deep-orange';
+    case 'liberou': return 'warning';
+    case 'alterou_responsavel': return 'purple';
+    default: return 'grey-7';
+  }
+}
+
+function labelBadgePorAcao(tipoAcao: string): string {
+  switch (tipoAcao) {
+    case 'marcou': return 'Marcou item';
+    case 'alterou_quantidade': return 'Alterou quantidade';
+    case 'liberou': return 'Deixou sem ninguém';
+    case 'alterou_responsavel': return 'Alterou responsável';
+    default: return 'Atualização';
+  }
+}
+
+function corFundoPorAcao(tipoAcao: string): string {
+  switch (tipoAcao) {
+    case 'marcou': return 'light-blue-1';
+    case 'alterou_quantidade': return 'orange-1';
+    case 'liberou': return 'amber-1';
+    case 'alterou_responsavel': return 'purple-1';
+    default: return 'grey-2';
+  }
+}
+
+function corTextoPorAcao(tipoAcao: string): string {
+  switch (tipoAcao) {
+    case 'marcou': return 'primary';
+    case 'alterou_quantidade': return 'deep-orange';
+    case 'liberou': return 'orange-9';
+    case 'alterou_responsavel': return 'purple-9';
+    default: return 'grey-8';
+  }
+}
 
 const modalAdministradores = ref(false);
 
