@@ -1,0 +1,13 @@
+node_modules
+.quasar
+dist
+server/node_modules
+server/dist
+server/data/*.sqlite
+server/data/*.sqlite-journal
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+

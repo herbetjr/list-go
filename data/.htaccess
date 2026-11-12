@@ -1,0 +1,7 @@
+# Bloquear download direto de arquivos do banco de dados SQLite
+<Files "*">
+  Order allow,deny
+  Deny from all
+</Files>
+Require all denied
+

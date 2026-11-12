@@ -1,0 +1,44 @@
+{
+  "name": "lista-go-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API NestJS + SQLite do Lista GO",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "schema:drop": "typeorm-ts-node-commonjs schema:drop -d src/data-source.ts",
+    "seed": "ts-node src/seeders/run.ts",
+    "migration:fresh": "typeorm-ts-node-commonjs schema:drop -d src/data-source.ts && typeorm-ts-node-commonjs migration:run -d src/data-source.ts && ts-node src/seeders/run.ts",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
+    "migration:create": "typeorm-ts-node-commonjs migration:create"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/jwt": "^12.0.3",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.4.7",
+    "@nestjs/typeorm": "^11.0.0",
+    "better-sqlite3": "^12.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "nanoid": "^3.3.8",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.19.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}
