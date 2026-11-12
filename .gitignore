@@ -10,4 +10,5 @@ server/data/*.sqlite-journal
 !.env.example
 .DS_Store
 Thumbs.db
+dist.zip
 
