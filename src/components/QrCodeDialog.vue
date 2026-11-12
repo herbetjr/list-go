@@ -127,7 +127,7 @@ async function copiarLink() {
 
 function compartilharWhatsApp() {
   const texto = encodeURIComponent(
-    `Olá! Veja a nossa lista "${props.tituloLista}" no Quem Leva o Quê? e marque o que você vai levar: ${urlCompleta.value}`,
+    `Olá! Veja a nossa lista "${props.tituloLista}" e marque o que você vai levar: ${urlCompleta.value}`,
   );
   window.open(`https://api.whatsapp.com/send?text=${texto}`, '_blank');
 }

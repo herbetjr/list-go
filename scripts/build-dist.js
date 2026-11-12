@@ -79,7 +79,14 @@ Require all denied
   fs.writeFileSync(path.join(dataDest, '.htaccess'), dataHtaccess, 'utf-8');
   console.log('✓ Pasta dist/data protegida (sem banco embutido - o SQLite será criado e migrado automaticamente no servidor)');
 
-  // 5. Gerar .htaccess da raiz (Roteador Apache para PHP e SPA)
+  // 5. Copiar share.php para a raiz de dist/ (Para Open Graph dinâmico no WhatsApp/redes sociais)
+  const shareSrc = path.join(rootDir, 'share.php');
+  if (fs.existsSync(shareSrc)) {
+    fs.cpSync(shareSrc, path.join(distDir, 'share.php'));
+    console.log('✓ Script share.php posicionado na raiz de dist/');
+  }
+
+  // 6. Gerar .htaccess da raiz (Roteador Apache para PHP e SPA)
   const rootHtaccess = `# Configuração Apache para API PHP + Frontend SPA
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -94,7 +101,10 @@ Require all denied
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 3. Todas as demais rotas são páginas do SPA Quasar (Vue Router)
+  # 3. Rota de compartilhamento: serve HTML com Open Graph dinâmico para WhatsApp e redes sociais
+  RewriteRule ^lista/([a-zA-Z0-9_-]+)/?$ share.php?codigo=$1 [QSA,L]
+
+  # 4. Todas as demais rotas são páginas do SPA Quasar (Vue Router)
   RewriteRule ^ index.html [L]
 </IfModule>
 
@@ -102,9 +112,9 @@ Require all denied
 Options -Indexes
 `;
   fs.writeFileSync(htaccessPath, rootHtaccess, 'utf-8');
-  console.log('✓ Arquivo dist/.htaccess configurado (API PHP + SPA)');
+  console.log('✓ Arquivo dist/.htaccess configurado (API PHP + SPA + Open Graph)');
 
-  // 6. Gerar arquivo dist.zip leve (< 2MB)
+  // 7. Gerar arquivo dist.zip leve (< 2MB)
   console.log('\n--- Gerando dist.zip ---');
   if (fs.existsSync(zipPath)) {
     fs.rmSync(zipPath, { force: true });

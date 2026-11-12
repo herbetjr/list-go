@@ -517,6 +517,16 @@ const authStore = useAuthStore();
 
 const lista = computed(() => listaStore.listaAtual);
 
+watch(
+  () => lista.value?.titulo,
+  (titulo) => {
+    if (titulo) {
+      document.title = `${titulo} - Listas Compartilhadas`;
+    }
+  },
+  { immediate: true },
+);
+
 const itensOrdenados = computed(() => {
   if (!lista.value?.itens) return [];
   // Mantém itens sem responsável no topo
