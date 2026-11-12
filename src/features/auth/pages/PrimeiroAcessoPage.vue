@@ -114,6 +114,11 @@
           </div>
         </q-card-section>
       </q-card>
+
+      <!-- Rodapé -->
+      <div class="text-caption text-grey-6 q-mt-lg text-center">
+        Desenvolvido por <strong>Herbet Júnior</strong>
+      </div>
     </div>
   </div>
 </template>

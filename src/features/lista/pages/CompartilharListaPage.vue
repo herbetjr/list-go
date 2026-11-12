@@ -58,6 +58,12 @@
         />
       </q-page>
     </q-page-container>
+
+    <q-footer class="bg-white text-grey-7 q-py-sm text-center" style="border-top: 1px solid #e2e8f0">
+      <div class="text-caption">
+        Desenvolvido por <strong>Herbet Júnior</strong>
+      </div>
+    </q-footer>
   </q-layout>
 </template>
 
